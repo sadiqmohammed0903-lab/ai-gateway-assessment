@@ -1,0 +1,48 @@
+[project]
+name = "ai-gateway-assessment"
+version = "0.1.0"
+description = "MCP server, MCP gateway, LLM streaming guardrail and model router"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp==2.3.0",
+    "fastapi==0.162.2",
+    "uvicorn==0.54.0",
+    "httpx==0.28.1",
+    "pydantic==2.14.3",
+    "PyJWT==2.15.1",
+    "aiosqlite==0.22.1",
+    "tiktoken==0.14.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.2.0",
+    "pytest-asyncio==1.4.1.post1",
+    "ruff==0.17.4",
+    "mypy==2.4.1",
+]
+
+[tool.setuptools]
+packages = ["common", "task1_mcp_server", "task2_mcp_gateway", "task3_llm_guardrail", "task4_model_router"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["common", "task1_mcp_server", "task2_mcp_gateway", "task3_llm_guardrail", "task4_model_router"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "T201"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/bench_*.py" = ["T201"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_unused_ignores = true
+

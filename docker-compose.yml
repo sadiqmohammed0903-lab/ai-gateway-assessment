@@ -1,0 +1,63 @@
+# docker compose up --build
+# Requires JWT_SECRET (>= 32 chars), e.g.:  JWT_SECRET=$(openssl rand -hex 32) docker compose up --build
+x-app: &app
+  build: .
+  restart: unless-stopped
+  environment: &env
+    HOST: 0.0.0.0
+
+services:
+  # ---- Task 2: MCP gateway -> mock downstream MCP server ----
+  mcp-downstream:
+    <<: *app
+    command: ["python", "-m", "uvicorn", "task2_mcp_gateway.mock_downstream:app", "--host", "0.0.0.0", "--port", "9001"]
+  mcp-gateway:
+    <<: *app
+    command: ["python", "-m", "task2_mcp_gateway.app"]
+    environment:
+      <<: *env
+      PORT: "9000"
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET to a random string of at least 32 characters}
+      DOWNSTREAM_URL: http://mcp-downstream:9001/mcp
+    ports: ["9000:9000"]
+    depends_on: [mcp-downstream]
+
+  # ---- Task 3: LLM gateway with streaming PII guardrail ----
+  mock-llm:
+    <<: *app
+    command: ["python", "-m", "uvicorn", "task3_llm_guardrail.mock_llm:app", "--host", "0.0.0.0", "--port", "9101"]
+    environment:
+      <<: *env
+      MOCK_LLM_DELAY_MS: "200"
+  llm-gateway:
+    <<: *app
+    command: ["python", "-m", "task3_llm_guardrail.app"]
+    environment:
+      <<: *env
+      PORT: "9100"
+      UPSTREAM_URL: http://mock-llm:9101/v1/chat/completions
+    ports: ["9100:9100"]
+    depends_on: [mock-llm]
+
+  # ---- Task 4: rate limiter + fallback router ----
+  provider-primary:
+    <<: *app
+    command: ["python", "-m", "uvicorn", "task4_model_router.mock_providers:primary_app", "--host", "0.0.0.0", "--port", "9301"]
+  provider-secondary:
+    <<: *app
+    command: ["python", "-m", "uvicorn", "task4_model_router.mock_providers:secondary_app", "--host", "0.0.0.0", "--port", "9302"]
+  model-router:
+    <<: *app
+    command: ["python", "-m", "task4_model_router.app"]
+    environment:
+      <<: *env
+      PORT: "9300"
+      DATABASE_PATH: /data/gateway.db
+      PRIMARY_URL: http://provider-primary:9301/v1/completions
+      SECONDARY_URL: http://provider-secondary:9302/v1/completions
+    volumes: ["router-data:/data"]
+    ports: ["9300:9300"]
+    depends_on: [provider-primary, provider-secondary]
+
+volumes:
+  router-data:
